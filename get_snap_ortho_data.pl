@@ -23,10 +23,10 @@ MAIN:
 for my $n (1 .. 11031) {
     print STDERR "$n\n";
     if ($n == 6109) { next MAIN; }
-    my $min_len = -1;
+    my $max_len = 0;
     my %geods;
     my $l = 0.8;
-    while (keys %geods < 8) {
+    while ($max_len < 0.8) {
         $l += 0.2;
         open(PS, get_geods($n,$l)) or die "Failed on : $!";
         while (<PS>) {
@@ -34,12 +34,9 @@ for my $n (1 .. 11031) {
                 my $m = $1;
                 my $real = $2;
                 my $imag = $3;
-                if ($real == $min_len || keys %geods < 8) {
-                    if ($min_len < 0) { $min_len = $real; }
-                    $geods{$m} = "$real$imag*1j";
-                } 
-            }
-            if (/.*Dirichlet.*/) {
+                if ($max_len < $real) { $max_len = $real; }
+                $geods{$m} = "$real$imag*1j";
+            } elsif (/.*Dirichlet.*/) {
                 print STDERR "$n Dirichlet domain failed\n";
                 next MAIN;
             }
