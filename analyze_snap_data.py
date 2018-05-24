@@ -45,5 +45,6 @@ if __name__ == "__main__":
         values = line.rstrip().split(',')
 #        print(values) 
         if len(values) == 4 :
-            n, l1, l2, d = map(eval, values)
-            print("{} : {}".format(n, get_margulis_bound(l1,l2,d.real)))
+            name = values[0]
+            l1, l2, d = map(eval, values[1:])
+            print("{} : {}".format(name, get_margulis_bound(l1,l2,d.real)))
