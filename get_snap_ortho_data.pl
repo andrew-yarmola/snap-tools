@@ -3,8 +3,8 @@ use strict;
 use warnings;
 use Math::Trig;
 use Math::Complex;
-use Data::Dumper;
 
+my $margulis_bound = 0.8;
 my $type = 'closed';
 my $mfld_count  = 11031;
 my %cusped_counts = ( 5 => 414, 6 => 961, 7 => 3551 );
@@ -42,9 +42,8 @@ MAIN:
 for my $n (1 .. $mfld_count) {
     print STDERR "$type $n\n";
     my %geods;
-    my $len_bound = 0.8;
     # Simple, but hang suseptable way of proecessing system command
-    open(PS, get_geods($type, $n, $len_bound)) or die "Failed on : $!";
+    open(PS, get_geods($type, $n, $margulis_bound)) or die "Failed on : $!";
     while (<PS>) {
         if (/\[(\d+)\]  ([0-9\.]+)([0-9\.\+\-]+)*/) {
             my $m = $1;
@@ -63,7 +62,7 @@ for my $n (1 .. $mfld_count) {
     # Largest othroline length so that at midpoint the shortest geod can move by 0.8
     my $ortho_bound = 0.5;
     for my $z (values %geods) {
-        my $d = 2.*acosh(sqrt((cosh(0.8)-cos(Im($z)))/(cosh(Re($z))-cos(Im($z)))));
+        my $d = 2.*acosh(sqrt((cosh($margulis_bound)-cos(Im($z)))/(cosh(Re($z))-cos(Im($z)))));
         print STDERR "$z --> $d\n";
         if ($ortho_bound < $d) {
             $ortho_bound = $d;
@@ -78,7 +77,7 @@ for my $n (1 .. $mfld_count) {
     eval {
         local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
         alarm 60;
-        $pid = open(PS, get_ortho($type, $n, $len_bound, $ortho_bound, keys %geods)) or die "Failed on : $!";
+        $pid = open(PS, get_ortho($type, $n, $margulis_bound, $ortho_bound, keys %geods)) or die "Failed on : $!";
         while (<PS>) {
             if (/([0-9\.]+)([0-9\.\+\-]+)\*i  (\d+):.+  (\d+):.*/) {
                 my $real = $1;
@@ -102,10 +101,10 @@ for my $n (1 .. $mfld_count) {
         kill 15, $pid+2; # HACK!!! echo and snap in the command get their own pids.
         next MAIN;
     }
-#   print Dumper(\%orthos);
 
     while (my ($k, $v) = each %orthos) {
         my ($left, $right) = split(/:/, $k);
+#        print "    from [$left] to [$right] --> $v\n"; 
         my $out = "$type $n, $geods{$left}, $geods{$right}, $v\n";
         $out =~ s/i/*1j/g;
         print "$out";

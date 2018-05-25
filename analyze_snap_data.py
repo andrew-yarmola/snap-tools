@@ -41,18 +41,18 @@ def get_margulis_bound(l1,l2,d) :
     return arccosh(cosh_lox_move_dist(l1,t_min))
 
 if __name__ == "__main__":
+    margulis_bound = 0.8
     for line in sys.stdin :
         values = line.rstrip().split(',')
         if len(values) == 4 :
             name = values[0]
             l1, l2, d = map(eval, values[1:])
             loop_count = 0
-            # 0.8 is our upper bound for Margulis number
             L1 = l1
-            while L1.real < 0.8 :
+            while L1.real < margulis_bound :
                 L2 = l2
-                while L2.real < 0.8 :
-                    print("{} : {}".format(name, get_margulis_bound(L1,L2,d.real)))
+                while L2.real < margulis_bound :
+                    print("{} : {} : {} : {} : {}".format(name, get_margulis_bound(L1,L2,d.real), L1, L2, d))
                     L2 += L2
                     loop_count += 1
                 L1 += L1
