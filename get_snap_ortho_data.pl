@@ -1,13 +1,13 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-# use Data::Dumper;
+use Math::Trig;
+use Math::Complex;
+use Data::Dumper;
 
 my $type = 'closed';
 my $mfld_count  = 11031;
-# my $mfld_count  = 1;
 my %cusped_counts = ( 5 => 414, 6 => 961, 7 => 3551 );
-# my %cusped_counts = ( 5 => 1, 6 => 1, 7 => 1 );
 if (@ARGV > 0) {
     if ($ARGV[0] eq 'cusped') {
         my $tet_num = 7;
@@ -41,53 +41,73 @@ sub get_ortho {
 MAIN: 
 for my $n (1 .. $mfld_count) {
     print STDERR "$type $n\n";
-    if ($type eq 'closed' && $n == 6109) { next MAIN; }
-    my $max_len = 0;
     my %geods;
-    my $l = 0.8;
-    while ($max_len < 0.8) {
-        $l += 0.2;
-        open(PS, get_geods($type, $n,$l)) or die "Failed on : $!";
-        while (<PS>) {
-            if (/\[(\d+)\]  ([0-9\.]+)([0-9\.\+\-]+)*/) {
-                my $m = $1;
-                my $real = $2;
-                my $imag = $3;
-                if ($max_len < $real) { $max_len = $real; }
-                $geods{$m} = "$real$imag*1j";
-            } elsif (/.*Dirichlet.*/) {
-                print STDERR "$n Dirichlet domain failed\n";
-                next MAIN;
-            }
+    my $len_bound = 0.8;
+    # Simple, but hang suseptable way of proecessing system command
+    open(PS, get_geods($type, $n, $len_bound)) or die "Failed on : $!";
+    while (<PS>) {
+        if (/\[(\d+)\]  ([0-9\.]+)([0-9\.\+\-]+)*/) {
+            my $m = $1;
+            my $real = $2;
+            my $imag = $3;
+            $geods{$m} = $real + $imag * i;
+        } elsif (/.*Dirichlet.*/) {
+            print STDERR "Dirichlet domain failed for $type $n\n";
+            next MAIN;
         }
-        close PS;
     }
-#    print Dumper(\%geods);
+    close PS;
 
-    my $num_geods = keys %geods;
-    my $num_pairs = int($num_geods*($num_geods - 1)/2) + $num_geods;
+    if (keys %geods < 1) { next MAIN; }
+
+    # Largest othroline length so that at midpoint the shortest geod can move by 0.8
+    my $ortho_bound = 0.5;
+    for my $z (values %geods) {
+        my $d = 2.*acosh(sqrt((cosh(0.8)-cos(Im($z)))/(cosh(Re($z))-cos(Im($z)))));
+        print STDERR "$z --> $d\n";
+        if ($ortho_bound < $d) {
+            $ortho_bound = $d;
+        }
+    }
+    $ortho_bound += 0.1; # just for sanity
+    print STDERR "$ortho_bound\n";
+
+    # Different/safer way of processing system command
+    my $pid;
     my %orthos;
-    my $d = 1.8;
-    while (keys %orthos < $num_pairs) {
-        $d += 0.2;
-        open(PS, get_ortho($type, $n, $l, $d, keys %geods)) or die "Failed on : $!";
+    eval {
+        local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
+        alarm 60;
+        $pid = open(PS, get_ortho($type, $n, $len_bound, $ortho_bound, keys %geods)) or die "Failed on : $!";
         while (<PS>) {
             if (/([0-9\.]+)([0-9\.\+\-]+)\*i  (\d+):.+  (\d+):.*/) {
                 my $real = $1;
                 my $imag = $2;
                 my $left = $3;
                 my $right = $4;
-                if (! exists $orthos{"$left:$right"} && $real != 0.0) {
-                    $orthos{"$left:$right"} = "$real$imag*1j"; 
+                if (! exists $orthos{"$left:$right"}) {
+                    if ($real != 0.0) {
+                        $orthos{"$left:$right"} = $real + $imag * i; 
+                    } else {
+                        print STDERR "Found 0 length ortholine for $type $n\n";
+                    }
                 } 
             }
         }
         close PS;
+        alarm 0;
+    };
+    if ($@) {
+        print STDERR "Timeout for $type $n\n";
+        kill 15, $pid+2; # HACK!!! echo and snap in the command get their own pids.
+        next MAIN;
     }
-#    print Dumper(\%orthos);
+#   print Dumper(\%orthos);
 
     while (my ($k, $v) = each %orthos) {
         my ($left, $right) = split(/:/, $k);
-        print "$type $n, $geods{$left}, $geods{$right}, $v\n";
+        my $out = "$type $n, $geods{$left}, $geods{$right}, $v\n";
+        $out =~ s/i/*1j/g;
+        print "$out";
     }
 }
