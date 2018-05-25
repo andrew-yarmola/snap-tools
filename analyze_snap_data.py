@@ -43,8 +43,18 @@ def get_margulis_bound(l1,l2,d) :
 if __name__ == "__main__":
     for line in sys.stdin :
         values = line.rstrip().split(',')
-#        print(values) 
         if len(values) == 4 :
             name = values[0]
             l1, l2, d = map(eval, values[1:])
-            print("{} : {}".format(name, get_margulis_bound(l1,l2,d.real)))
+            loop_count = 0
+            # 0.8 is our upper bound for Margulis number
+            L1 = l1
+            while L1.real < 0.8 :
+                L2 = l2
+                while L2.real < 0.8 :
+                    print("{} : {}".format(name, get_margulis_bound(L1,L2,d.real)))
+                    L2 += L2
+                    loop_count += 1
+                L1 += L1
+            if loop_count > 1 :
+                print("{} count {}".format(name, loop_count), file = sys.stderr)
