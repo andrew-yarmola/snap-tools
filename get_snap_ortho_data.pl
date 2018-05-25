@@ -61,14 +61,18 @@ for my $n (1 .. $mfld_count) {
 
     # Largest othroline length so that at midpoint the shortest geod can move by 0.8
     my $ortho_bound = 0.5;
-    for my $z (values %geods) {
-        my $d = 2.*acosh(sqrt((cosh($margulis_bound)-cos(Im($z)))/(cosh(Re($z))-cos(Im($z)))));
-        print STDERR "$z --> $d\n";
-        if ($ortho_bound < $d) {
-            $ortho_bound = $d;
+    for my $w (values %geods) {
+        my $z = $w; # copy to inciment
+        while (Re($z) < $margulis_bound) {
+            my $d = 2.*acosh(sqrt((cosh($margulis_bound)-cos(Im($z)))/(cosh(Re($z))-cos(Im($z)))));
+            print STDERR "$z --> $d\n";
+            if ($ortho_bound < $d) {
+                $ortho_bound = $d;
+            }
+            $z += $w;
         }
     }
-    $ortho_bound += 0.1; # just for sanity
+    $ortho_bound += 0.05; # just for sanity
     print STDERR "$ortho_bound\n";
 
     # Different/safer way of processing system command
@@ -76,7 +80,7 @@ for my $n (1 .. $mfld_count) {
     my %orthos;
     eval {
         local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
-        alarm 60;
+        alarm 180;
         $pid = open(PS, get_ortho($type, $n, $margulis_bound, $ortho_bound, keys %geods)) or die "Failed on : $!";
         while (<PS>) {
             if (/([0-9\.]+)([0-9\.\+\-]+)\*i  (\d+):.+  (\d+):.*/) {
@@ -98,7 +102,7 @@ for my $n (1 .. $mfld_count) {
     };
     if ($@) {
         print STDERR "Timeout for $type $n\n";
-        kill 15, $pid+2; # HACK!!! echo and snap in the command get their own pids.
+        kill 9, $pid+2; # HACK!!! echo and snap in the command get their own pids.
         next MAIN;
     }
 

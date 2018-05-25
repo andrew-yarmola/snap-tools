@@ -53,8 +53,8 @@ if __name__ == "__main__":
                 L2 = l2
                 while L2.real < margulis_bound :
                     print("{} : {} : {} : {} : {}".format(name, get_margulis_bound(L1,L2,d.real), L1, L2, d))
-                    L2 += L2
+                    L2 += l2
                     loop_count += 1
-                L1 += L1
+                L1 += l1
             if loop_count > 1 :
                 print("{} count {}".format(name, loop_count), file = sys.stderr)
