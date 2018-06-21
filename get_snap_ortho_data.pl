@@ -21,21 +21,16 @@ if (@ARGV > 0) {
 }
 
 sub get_geods {
-    my $t = shift;
-    my $n = shift;
-    my $l = shift;
+    my ($t, $n, $l) = @_;
     return  "echo 'read $t $n
                    print geodesics $l' | snap |";
 }
 
 sub get_ortho {
-    my $t = shift;
-    my $n = shift;
-    my $l = shift;
-    my $d = shift;
+    my ($t, $n, $l, $d, @gs)  = @_;
     return "echo 'read $t $n
                   print geodesics $l
-                  print ortholines $d @_' | snap |";
+                  print ortholines $d @gs' | snap |";
 }
 
 MAIN: 
