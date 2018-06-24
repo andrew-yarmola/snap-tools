@@ -23,6 +23,7 @@ if (@ARGV > 0) {
 sub get_geods {
     my ($t, $n, $l) = @_;
     return  "echo 'read $t $n
+                   print name
                    print geodesics $l' | snap |";
 }
 
@@ -30,12 +31,15 @@ sub get_ortho {
     my ($t, $n, $l, $d, @gs)  = @_;
     return "echo 'read $t $n
                   print geodesics $l
-                  print ortholines $d @gs' | snap |";
+                  ortholines $d @gs' | snap |";
 }
+
+print "\"name\",\"left geod\",\"right geod\",\"ortho\"\n";
 
 MAIN: 
 for my $n (1 .. $mfld_count) {
-    print STDERR "$type $n\n";
+    my $name = "$type $n";
+    print STDERR "$name\n";
     my %geods;
     # Simple, but hang suseptable way of proecessing system command
     open(PS, get_geods($type, $n, $margulis_bound)) or die "Failed on : $!";
@@ -45,6 +49,8 @@ for my $n (1 .. $mfld_count) {
             my $real = $2;
             my $imag = $3;
             $geods{$m} = $real + $imag * i;
+        } elsif (/.*name : (.*)/) {
+            $name = $1;
         } elsif (/.*Dirichlet.*/) {
             print STDERR "Dirichlet domain failed for $type $n\n";
             next MAIN;
@@ -60,7 +66,7 @@ for my $n (1 .. $mfld_count) {
         my $z = $w; # copy to inciment
         while (Re($z) < $margulis_bound) {
             my $d = 2.*acosh(sqrt((cosh($margulis_bound)-cos(Im($z)))/(cosh(Re($z))-cos(Im($z)))));
-            print STDERR "$z --> $d\n";
+            # print STDERR "$z --> $d\n";
             if ($ortho_bound < $d) {
                 $ortho_bound = $d;
             }
@@ -68,14 +74,14 @@ for my $n (1 .. $mfld_count) {
         }
     }
     $ortho_bound += 0.05; # just for sanity
-    print STDERR "$ortho_bound\n";
+    # print STDERR "$ortho_bound\n";
 
     # Different/safer way of processing system command
     my $pid;
     my %orthos;
     eval {
         local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
-        alarm 180;
+        alarm 240;
         $pid = open(PS, get_ortho($type, $n, $margulis_bound, $ortho_bound, keys %geods)) or die "Failed on : $!";
         while (<PS>) {
             if (/([0-9\.]+)([0-9\.\+\-]+)\*i  (\d+):.+  (\d+):.*/) {
@@ -92,19 +98,23 @@ for my $n (1 .. $mfld_count) {
                 } 
             }
         }
-        close PS;
         alarm 0;
+        close PS;
     };
     if ($@) {
-        print STDERR "Timeout for $type $n\n";
-        kill 9, $pid+2; # HACK!!! echo and snap in the command get their own pids.
+        if ($@ eq "alarm\n") {
+            print STDERR "Timeout for $type $n\n";
+        } else {
+            print STDERR "Failed for $type $n\n";
+        }            
+        if (defined $pid) { kill 9, $pid+2; } # HACK!!! echo and snap in the command get their own pids.
         next MAIN;
     }
 
     while (my ($k, $v) = each %orthos) {
         my ($left, $right) = split(/:/, $k);
 #        print "    from [$left] to [$right] --> $v\n"; 
-        my $out = "$type $n, $geods{$left}, $geods{$right}, $v\n";
+        my $out = "\"$name\",$geods{$left},$geods{$right},$v\n";
         $out =~ s/i/*1j/g;
         print "$out";
     }
