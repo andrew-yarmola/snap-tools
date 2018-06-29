@@ -115,7 +115,7 @@ for my $n (1 .. $mfld_count) {
         my ($left, $right) = split(/:/, $k);
 #        print "    from [$left] to [$right] --> $v\n"; 
         my $out = "\"$name\",$geods{$left},$geods{$right},$v\n";
-        $out =~ s/i/*1j/g;
+        $out =~ s/i/j/g;
         print "$out";
     }
 }

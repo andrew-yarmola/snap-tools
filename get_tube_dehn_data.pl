@@ -154,7 +154,7 @@ for my $n (@mld_idx) {
                 $k += 1;
             }
             my $out = "\"$name\",$g,$l,$r,$d\n";
-            $out =~ s/i/*1j/g;
+            $out =~ s/i/j/g;
             print "$out";
         }
     }
