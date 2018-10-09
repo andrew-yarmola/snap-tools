@@ -24,6 +24,7 @@ sub get_geods {
     my ($t, $n, $l) = @_;
     return  "echo 'read $t $n
                    print name
+                   print volume
                    print geodesics $l' | snap |";
 }
 
@@ -34,23 +35,26 @@ sub get_ortho {
                   ortholines $d @gs' | snap |";
 }
 
-print "\"name\",\"left geod\",\"right geod\",\"ortho\"\n";
+print "\"name\",\"volume\",\"left geod\",\"right geod\",\"ortho\"\n";
 
 MAIN: 
 for my $n (1 .. $mfld_count) {
     my $name = "$type $n";
+    my $volume = 0.0;
     print STDERR "$name\n";
     my %geods;
     # Simple, but hang suseptable way of proecessing system command
     open(PS, get_geods($type, $n, $margulis_bound)) or die "Failed on : $!";
     while (<PS>) {
-        if (/\[(\d+)\]  ([0-9\.]+)([0-9\.\+\-]+)*/) {
+        if (/\[(\d+)\]\s+([0-9\.]+)([0-9\.\+\-]+)*/) {
             my $m = $1;
             my $real = $2;
             my $imag = $3;
             $geods{$m} = $real + $imag * i;
         } elsif (/.*name : (.*)/) {
             $name = $1;
+        } elsif (/.*Volume is: (.*)/) {
+            $volume = $1;
         } elsif (/.*Dirichlet.*/) {
             print STDERR "Dirichlet domain failed for $type $n\n";
             next MAIN;
@@ -90,11 +94,10 @@ for my $n (1 .. $mfld_count) {
                 my $left = $3;
                 my $right = $4;
                 if (! exists $orthos{"$left:$right"}) {
-                    if ($real != 0.0) {
-                        $orthos{"$left:$right"} = $real + $imag * i; 
-                    } else {
+                    if ($real == 0.0) {
                         print STDERR "Found 0 length ortholine for $type $n\n";
                     }
+                    $orthos{"$left:$right"} = $real + $imag * i; 
                 } 
             }
         }
@@ -114,8 +117,10 @@ for my $n (1 .. $mfld_count) {
     while (my ($k, $v) = each %orthos) {
         my ($left, $right) = split(/:/, $k);
 #        print "    from [$left] to [$right] --> $v\n"; 
-        my $out = "\"$name\",$geods{$left},$geods{$right},$v\n";
+        my $out = "\"$name\",$volume,$geods{$left},$geods{$right},$v\n";
         $out =~ s/i/j/g;
+        $out =~ s/\+j/+1j/g; # so python eval is not angry
+        $out =~ s/-j/-1j/g; # so python eval is not angry
         print "$out";
     }
 }
