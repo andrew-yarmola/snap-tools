@@ -83,33 +83,35 @@ def get_ortho_bound(length_list, margulis_bound) :
 
 if __name__ == "__main__" :
     def print_usage() :
-            print('Usage : margulis type mfld_idx [margulis_bound] [p] [q]\n'
-                  '   type : snap census type, either 5,6,7, or closed.\n'
-                  '   mfld_idx : snap census manfiold index\n'
+            print('Usage : margulis type mfld [margulis_bound] [p] [q]\n'
+                  '   type : snap census type, either 5,6,7, closed, manifold, or file.\n'
+                  '   mfld : snap census manfiold index or file name\n'
                   '   margulis_bound : optional starting guess, but required if giving slope\n'
                   '   p,q : the meridian and longitude filling slope, respectivly.')
 
     census_counts = {'5' : 414, '6' : 961, '7' : 3551, 'closed' : 11031}
     census_letters = {'5' : 'm', '6' : 's', '7' : 'v'}
+    other_types = ['file','manifold','link']
     if ( len(sys.argv) < 3 or
-         sys.argv[1] not in census_counts.keys() or
-         int(sys.argv[2]) > census_counts[sys.argv[1]] ) :
+         (sys.argv[1] in census_counts.keys() and
+         int(sys.argv[2]) > census_counts[sys.argv[1]]) or 
+         (sys.argv[1] not in census_counts.keys() and sys.argv[1] not in other_types) ) :
         print_usage() 
         sys.exit(2)
 
-    census_type = sys.argv[1]
-    census_idx = sys.argv[2]
+    mfld_type = sys.argv[1]
+    mfld_id = sys.argv[2]
 
     # cusped and surgery cases
-    if census_type != 'closed' :
+    if mfld_type in census_counts.keys() and mfld_type != 'closed' :
         if len(sys.argv) > 5 :
             type_zfill = {'5' : 3, '6' : 3, '7' : 4}
-            census_idx = '{}{}({},{})'.format(census_letters[census_type],
-                                              census_idx.zfill(type_zfill[census_type]),
+            mfld_id = '{}{}({},{})'.format(census_letters[mfld_type],
+                                              mfld_id.zfill(type_zfill[mfld_type]),
                                               sys.argv[4], sys.argv[5])
-            census_type = 'manifold'
+            mfld_type = 'manifold'
         else : 
-            census_type = 'census ' + census_type
+            mfld_type = 'census ' + mfld_type
  
     margulis_bound = 1.5
     if len(sys.argv) > 3 :
@@ -118,9 +120,9 @@ if __name__ == "__main__" :
         except :
             print('Using initial margulis guess of {}'.format(margulis_bound))
  
-    name = '{} {}'.format(census_type, census_idx)
+    name = '{} {}'.format(mfld_type, mfld_id)
     volume = None
-    info_out = get_mfld_info(census_type,census_idx)
+    info_out = get_mfld_info(mfld_type, mfld_id)
     if not info_out : sys.exit(3)
     for line in info_out.splitlines() :
         name_match = re.match('name : (.*)', line)    
@@ -141,7 +143,7 @@ if __name__ == "__main__" :
     best = {'margulis' : 0, 'left' : 0, 'right' : 0, 'ortho' : 0}
     while margulis_bound < 3 : # arbitrary bound on max guess
         geods = {}
-        geods_out = get_geods(census_type, census_idx, margulis_bound)
+        geods_out = get_geods(mfld_type, mfld_id, margulis_bound)
         if not geods_out :
             print('Computing geodesics failed or timed out. Try smaller margulis guess.', file = sys.stderr) 
             sys.exit(5)
@@ -153,7 +155,7 @@ if __name__ == "__main__" :
                 continue
             fail_match = re.match('.*Problem computing a Dirichlet domain', line)
             if fail_match :
-                print('Dirichlet domain failed for {} {}.'.format(census_type, census_idx),
+                print('Dirichlet domain failed for {} {}.'.format(mfld_type, mfld_id),
                       file = sys.stderr)
                 sys.exit(4)
         # increase guess if no geods are found
@@ -165,7 +167,7 @@ if __name__ == "__main__" :
        
         # get all needed ortholines
         orthos = {}       
-        orthos_out = get_orthos(census_type, census_idx, margulis_bound, ortho_bound, geods.keys())
+        orthos_out = get_orthos(mfld_type, mfld_id, margulis_bound, ortho_bound, geods.keys())
         if not orthos_out :
             print('Computing ortholines failed or timed out. Try smaller margulis guess.', file = sys.stderr) 
             sys.exit(6)
