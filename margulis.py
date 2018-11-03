@@ -49,12 +49,12 @@ def run_snap(cmds, timeout) :
         print('Failed or timed out.', file = sys.stderr)
     return out
 
-def get_geods(t, n, l, timeout = 180) :
+def get_geods(t, n, l, timeout = 240) :
     cmds = ''.join(('read {} {}\n'.format(t,n),
                     'print geodesics {}\n'.format(l))).encode()
     return run_snap(cmds, timeout)
 
-def get_orthos(t, n, l, d, geods, timeout = 300) :
+def get_orthos(t, n, l, d, geods, timeout = 600) :
     geod_str =  ' '.join(map(str,geods))
     cmds = ''.join(('read {} {}\n'.format(t,n),
                     'print geodesics {}\n'.format(l),
@@ -83,11 +83,11 @@ def get_ortho_bound(length_list, margulis_bound) :
 
 if __name__ == "__main__" :
     def print_usage() :
-            print('Usage : margulis type mfld [margulis_bound] [p] [q]\n'
+            print('Usage : margulis type mfld [margulis_bound] [m1] [l1] [m2] [l2] ...\n'
                   '   type : snap census type, either 5,6,7, closed, manifold, or file.\n'
                   '   mfld : snap census manfiold index or file name\n'
                   '   margulis_bound : optional starting guess, but required if giving slope\n'
-                  '   p,q : the meridian and longitude filling slope, respectivly.')
+                  '   m1,l1,m2,l2... : the meridian and longitude filling slopes, respectivly.')
 
     census_counts = {'5' : 414, '6' : 961, '7' : 3551, 'closed' : 11031}
     census_letters = {'5' : 'm', '6' : 's', '7' : 'v'}
@@ -102,16 +102,12 @@ if __name__ == "__main__" :
     mfld_type = sys.argv[1]
     mfld_id = sys.argv[2]
 
-    # cusped and surgery cases
     if mfld_type in census_counts.keys() and mfld_type != 'closed' :
-        if len(sys.argv) > 5 :
-            type_zfill = {'5' : 3, '6' : 3, '7' : 4}
-            mfld_id = '{}{}({},{})'.format(census_letters[mfld_type],
-                                              mfld_id.zfill(type_zfill[mfld_type]),
-                                              sys.argv[4], sys.argv[5])
-            mfld_type = 'manifold'
-        else : 
-            mfld_type = 'census ' + mfld_type
+        mfld_type = 'census ' + mfld_type
+
+    # cusped and surgery cases
+    if len(sys.argv) > 4 :
+        mfld_id += ' surgery ' + ' '.join(sys.argv[4:])
  
     margulis_bound = 1.5
     if len(sys.argv) > 3 :
