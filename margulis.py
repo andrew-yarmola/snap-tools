@@ -5,6 +5,58 @@ from scipy.optimize import brentq, minimize
 from functools import partial
 from numpy import sinh, cosh, arccosh, cos, sqrt
 from subprocess import check_output # switch from check_output to run in the future
+from copy import deepcopy
+
+scale_factor = 8
+scale = list(map(lambda x : scale_factor * pow(2, x / 6.), range(0,-6,-1)))
+COMP_ERR = pow(2,-100)
+
+def get_box_codes(validated_params, depth=125) :
+    params_printed = False
+    sinhP = validated_params['sinhP']
+    sinhD2 = validated_params['sinhD2']
+    sinhL2 = validated_params['sinhL2']
+    coord = [0]*6
+    coord[0] = sinhP.imag / scale[0]
+    coord[1] = sinhD2.imag / scale[1]
+    coord[2] = sinhL2.imag / scale[2]
+    coord[3] = sinhP.real / scale[3]
+    coord[4] = sinhD2.real / scale[4]
+    coord[5] = sinhL2.real / scale[5]
+    codes_list = [{ 'code' : [], 'coord' : coord }]
+    validated_params['possibly_on_box_edge'] = False
+    for i in range(0, depth) :
+        for idx in range(0,len(codes_list)) :
+            code = codes_list[idx]['code'] # Object that will be modified
+            coord = codes_list[idx]['coord'] # Object that will be modified
+            n = i % 6
+            if 2 * coord[n] > COMP_ERR :
+                code.append('1')
+                coord[n] = 2 * coord[n] - 1
+            elif 2 * coord[n] < -COMP_ERR :
+                code.append('0')
+                coord[n] = 2 * coord[n] + 1
+            else :
+                assert abs(coord[n]) < COMP_ERR
+                print('Warning: Edge condition for manifold {0} with coord {1}. Will generate both children.'.format(validated_params['manifold'], coord[n]), file = sys.stderr)
+                if not params_printed:
+                  print(validated_params, file = sys.stderr)
+                  params_printed = True
+                validated_params['possibly_on_box_edge'] = True
+                new_code_dict = deepcopy(codes_list[idx])
+                new_code = new_code_dict['code']
+                new_coord = new_code_dict['coord']
+                # Old will go to the right
+                code.append('1')
+                coord[n] = 2 * coord[n] - 1
+                # New will go to the left
+                new_code.append('0')
+                new_coord[n] = 2 * new_coord[n] + 1
+                codes_list.append(new_code_dict)
+    box_codes = []
+    for code_dict in codes_list :
+        box_codes.append(''.join(code_dict['code']))
+    return box_codes
 
 def cosh_lox_move_dist(l,d) :
     """ Let l be the complex length of a loxodromic element g and
@@ -27,16 +79,16 @@ def get_margulis_bound(l1,l2,d) :
     try :
         t_min = brentq(f,0,d)
         # print('Used Brent algo for l1 = {}, l2 = {}, d = {}'.format(l1,l2,d), file = sys.stderr)
-        return arccosh(cosh_lox_move_dist(l1,t_min))
+        return { 'margulis' : arccosh(cosh_lox_move_dist(l1,t_min)), 'point' : t_min }
     except :
         try :
             g = partial(max_of_two,l1,l2,d)
             res = minimize(g, d/2., bounds = ((0,d),))
             if res.success :
-                return arccosh(res.fun[0])
+                return { 'margulis' : arccosh(res.fun[0]), 'point' : res.x[0] }
             else :
                 print(res, file = sys.stderr)
-                return -1
+                return -2
         except :
             print('Completely failed for {}, {}, and {}'.format(l1,l2,d), file = sys.stderr)
             return -1
@@ -129,9 +181,10 @@ if __name__ == "__main__" :
         if vol_match :
             volume = vol_match.group(1)
             continue
-        fail_match = re.match('.*(other|flat|degenerate|nongeometric)', line)
+        # fail_match = re.match('.*(other|flat|degenerate|nongeometric)', line)
+        fail_match = re.match('.*(other|flat|degenerate)', line)
         if fail_match :
-            print('Non-hyperbolic {} solution for {}'.format(fail_match.group(1), name),
+            print('Failed gluing solution of type {} for {}'.format(fail_match.group(1), name),
                   file = sys.stderr)
             sys.exit(4)
     
@@ -186,15 +239,28 @@ if __name__ == "__main__" :
             l, r = geods[left], geods[right]
             D = ortho.real 
             L = l
+            l_pow = 1
             data = []
             while L.real < margulis_bound :
                 R = r
+                r_pow = 1
                 while R.real < margulis_bound :
-                    data.append(get_margulis_bound(L, R, D))
+                    margulis_info = get_margulis_bound(L, R, D)
+                    if isinstance(margulis_info, dict) :
+                      margulis_info['l_pow'] = l_pow
+                      margulis_info['r_pow'] = r_pow
+                      data.append(margulis_info)
                     R += r
+                    r_pow += 1
                 L += l
+                l_pow += 1
             if len(data) > 0 :
-                margulis_numbers.append({'margulis' : min(data), 'left' : l, 'right' : r, 'ortho' : ortho})
+                data.sort(key = lambda x : x['margulis'])
+                margulis_info = data[0]
+                margulis_info['left'] = l
+                margulis_info['right'] = r
+                margulis_info['ortho'] = ortho
+                margulis_numbers.append(margulis_info)
 
         sorted_margulis = sorted(margulis_numbers, key = lambda x : x['margulis'])
 
@@ -203,4 +269,19 @@ if __name__ == "__main__" :
             break
         else :
             margulis_bound = best['margulis'] + 0.0001 # just up by a little bit so it's really a bound and we termiante above
-    print('"{}",{},{},{},{},{}'.format(name, volume, best['margulis'], best['left'], best['right'], best['ortho'])) 
+    # get the box code
+    ortho = best['ortho']
+    l = best['left']
+    r = best['right']
+    l_pow = best['l_pow']
+    r_pow = best['r_pow']
+    sinhP = sinh(ortho)
+    sinhD2 = sinh(r / 2.)
+    sinhD2_realizing = sinh((r * r_pow) / 2.)
+    sinhL2 = sinh(l / 2.)
+    sinhL2_realizing = sinh((l * l_pow) / 2.)
+    box_codes = get_box_codes({'manifold' : name, 'sinhP' : sinhP, 'sinhD2' : sinhD2, 'sinhL2' : sinhL2})
+    box_codes_realizing = get_box_codes({'manifold' : name, 'sinhP' : sinhP, 'sinhD2' : sinhD2_realizing, 'sinhL2' : sinhL2_realizing})
+    t = best['point']
+    print('"{}",{},{},{},{},{},{},{},{},{},"{}","{}"'.format(name, volume, best['margulis'], l, r, ortho,
+                                                      t, ortho.real - t, l_pow, r_pow, box_codes, box_codes_realizing))
