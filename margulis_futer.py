@@ -3,26 +3,40 @@
 import re, sys, time
 from scipy.optimize import brentq, minimize
 from functools import partial
-from numpy import sinh, cosh, arccosh, cos, sqrt
+from numpy import pi, sinh, cosh, arccosh, sin, cos, sqrt
 from subprocess import check_output # switch from check_output to run in the future
 from copy import deepcopy
 
+twopi = 2*pi
 scale_factor = 8
 scale = list(map(lambda x : scale_factor * pow(2, x / 6.), range(0,-6,-1)))
 COMP_ERR = pow(2,-100)
 
-def get_box_codes(validated_params, depth=125) :
+def shift_imag_to_zero(x) :
+    print(x)
+    while x.imag > pi :
+      x -= twopi * 1j
+    print(x.imag, -pi + COMP_ERR, COMP_ERR, -pi + COMP_ERR)
+    while x.imag < -pi + COMP_ERR :
+      x += twopi * 1j
+    print(x)
+    return x  
+
+def get_box_codes(validated_params, depth=240) :
     params_printed = False
-    sinhP = validated_params['sinhP']
-    sinhD2 = validated_params['sinhD2']
-    sinhL2 = validated_params['sinhL2']
+    sinhdx = validated_params['sinhdx']
+    sinhdy = validated_params['sinhdy']
+    coshmu = validated_params['coshmu']
+    cosf = validated_params['cosf']
+    sintx2 = validated_params['sintx2']
+    sinty2 = validated_params['sinty2']
     coord = [0]*6
-    coord[0] = sinhP.imag / scale[0]
-    coord[1] = sinhD2.imag / scale[1]
-    coord[2] = sinhL2.imag / scale[2]
-    coord[3] = sinhP.real / scale[3]
-    coord[4] = sinhD2.real / scale[4]
-    coord[5] = sinhL2.real / scale[5]
+    coord[0] = sinhdx / (scale[0] * 16.) # these are special
+    coord[1] = sinhdy / (scale[1] * 16.) # these are special
+    coord[2] = coshmu / scale[2]
+    coord[3] = cosf / scale[3]
+    coord[4] = sintx2 / scale[4]
+    coord[5] = sinty2 / scale[5]
     codes_list = [{ 'code' : [], 'coord' : coord }]
     validated_params['possibly_on_box_edge'] = False
     for i in range(0, depth) :
@@ -58,8 +72,6 @@ def get_box_codes(validated_params, depth=125) :
         box_codes.append(''.join(code_dict['code']))
     return box_codes
 
-SNAP_BINARY = "/Users/yarmola/Projects/snap-pari/build/bin/snap"
-
 def cosh_lox_move_dist(l,d) :
     """ Let l be the complex length of a loxodromic element g and
         let x be a point distance d form the axis of g. This function
@@ -81,13 +93,13 @@ def get_margulis_bound(l1,l2,d) :
     try :
         t_min = brentq(f,0,d)
         # print('Used Brent algo for l1 = {}, l2 = {}, d = {}'.format(l1,l2,d), file = sys.stderr)
-        return { 'margulis' : arccosh(cosh_lox_move_dist(l1,t_min)), 'point' : t_min }
+        return { 'cosh_margulis' : cosh_lox_move_dist(l1,t_min), 'margulis' : arccosh(cosh_lox_move_dist(l1,t_min)), 'point' : t_min }
     except :
         try :
             g = partial(max_of_two,l1,l2,d)
             res = minimize(g, d/2., bounds = ((0,d),))
             if res.success :
-                return { 'margulis' : arccosh(res.fun[0]), 'point' : res.x[0] }
+                return { 'cosh_margulis' : res.fun[0], 'margulis' : arccosh(res.fun[0]), 'point' : res.x[0] }
             else :
                 print(res, file = sys.stderr)
                 return -2
@@ -98,7 +110,7 @@ def get_margulis_bound(l1,l2,d) :
 def run_snap(cmds, timeout) :
     out = None
     try :
-        out = check_output(SNAP_BINARY, input = cmds, timeout = timeout).decode()
+        out = check_output('snap', input = cmds, timeout = timeout).decode()
     except :
         print('Failed or timed out.', file = sys.stderr)
     return out
@@ -273,17 +285,32 @@ if __name__ == "__main__" :
             margulis_bound = best['margulis'] + 0.0001 # just up by a little bit so it's really a bound and we termiante above
     # get the box code
     ortho = best['ortho']
-    l = best['left']
-    r = best['right']
-    l_pow = best['l_pow']
-    r_pow = best['r_pow']
-    sinhP = sinh(ortho)
-    sinhD2 = sinh(r / 2.)
-    sinhD2_realizing = sinh((r * r_pow) / 2.)
-    sinhL2 = sinh(l / 2.)
-    sinhL2_realizing = sinh((l * l_pow) / 2.)
-    box_codes = get_box_codes({'manifold' : name, 'sinhP' : sinhP, 'sinhD2' : sinhD2, 'sinhL2' : sinhL2})
-    box_codes_realizing = get_box_codes({'manifold' : name, 'sinhP' : sinhP, 'sinhD2' : sinhD2_realizing, 'sinhL2' : sinhL2_realizing})
     t = best['point']
-    print('"{}",{},{},{},{},{},{},{},{},{},"{}","{}"'.format(name, volume, best['margulis'], l, r, ortho,
-                                                      t, ortho.real - t, l_pow, r_pow, box_codes, box_codes_realizing))
+    if ortho.real == 0 or t == 0 or t == ortho.real : 
+        print("Not an internal parameter point!")
+        print(margulis_info)
+    else :
+        coshmu = best['cosh_margulis']
+        sinhdx = sinh(t)
+        sinhdy = sinh(ortho.real - t)
+        # corresponds to applying complex conj to the group to reduce parameter space
+        do_conj = True if ortho.imag < 0 else False
+        print(do_conj)
+        cosf = cos(ortho.imag)
+        l = best['left']
+        r = best['right']
+        if do_conj :
+          l = l.conjugate() 
+          r = r.conjugate() 
+          ortho = ortho.conjugate()
+        l_pow = best['l_pow']
+        r_pow = best['r_pow']
+        x = shift_imag_to_zero(l * l_pow)
+        y = shift_imag_to_zero(r * r_pow)
+        # complex conj will change the sign on the imag parts
+        sintx2 = sin(x.imag / 2.)
+        sinty2 = sin(y.imag / 2.)
+        box_codes = get_box_codes({'manifold' : name, 'coshmu' : coshmu, 'sinhdx' : sinhdx, 'sinhdy' : sinhdy, 'cosf' : cosf, 'sintx2' : sintx2, 'sinty2' : sinty2 })
+        line = '"{}",' + '{},' * 17 +'"{}"'
+        print(line.format(name, volume, best['margulis'], l, r, ortho,
+                          t, ortho.real - t, l_pow, r_pow, x,y, sinhdx, sinhdy, coshmu, cosf, sintx2, sinty2, box_codes))
