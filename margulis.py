@@ -11,6 +11,8 @@ scale_factor = 8
 scale = list(map(lambda x : scale_factor * pow(2, x / 6.), range(0,-6,-1)))
 COMP_ERR = pow(2,-100)
 
+SNAP_BINARY = "/Users/yarmola/Projects/snap-pari/build/bin/snap"
+
 def get_box_codes(validated_params, depth=125) :
     params_printed = False
     sinhP = validated_params['sinhP']
@@ -57,8 +59,6 @@ def get_box_codes(validated_params, depth=125) :
     for code_dict in codes_list :
         box_codes.append(''.join(code_dict['code']))
     return box_codes
-
-SNAP_BINARY = "/Users/yarmola/Projects/snap-pari/build/bin/snap"
 
 def cosh_lox_move_dist(l,d) :
     """ Let l be the complex length of a loxodromic element g and

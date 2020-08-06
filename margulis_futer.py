@@ -12,6 +12,8 @@ scale_factor = 8
 scale = list(map(lambda x : scale_factor * pow(2, x / 6.), range(0,-6,-1)))
 COMP_ERR = pow(2,-100)
 
+SNAP_BINARY = "/Users/yarmola/Projects/snap-pari/build/bin/snap"
+
 def shift_imag_to_zero(x) :
     print(x)
     while x.imag > pi :
@@ -110,7 +112,7 @@ def get_margulis_bound(l1,l2,d) :
 def run_snap(cmds, timeout) :
     out = None
     try :
-        out = check_output('snap', input = cmds, timeout = timeout).decode()
+        out = check_output(SNAP_BINARY, input = cmds, timeout = timeout).decode()
     except :
         print('Failed or timed out.', file = sys.stderr)
     return out
