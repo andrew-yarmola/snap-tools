@@ -6,6 +6,8 @@ from functools import partial
 from numpy import sinh, cosh, arccosh, cos, sqrt
 from subprocess import check_output # switch from check_output to run in the future
 
+SNAP_BINARY = "/Users/yarmola/Projects/snap-pari/build/bin/snap"
+
 def cosh_lox_move_dist(l,d) :
     """ Let l be the complex length of a loxodromic element g and
         let x be a point distance d form the axis of g. This function
@@ -44,7 +46,7 @@ def get_margulis_bound(l1,l2,d) :
 def run_snap(cmds, timeout) :
     out = None
     try :
-        out = check_output('snap', input = cmds, timeout = timeout).decode()
+        out = check_output(SNAP_BINARY, input = cmds, timeout = timeout).decode()
     except :
         print('Failed or timed out.', file = sys.stderr)
     return out
