@@ -6,73 +6,23 @@ from functools import partial
 from numpy import pi, sinh, cosh, arccosh, sin, cos, sqrt
 from subprocess import check_output # switch from check_output to run in the future
 from copy import deepcopy
+from box_codes import get_box_codes
+
 
 twopi = 2*pi
-scale_factor = 8
-scale = list(map(lambda x : scale_factor * pow(2, x / 6.), range(0,-6,-1)))
 COMP_ERR = pow(2,-100)
 
 SNAP_BINARY = "/Users/yarmola/Projects/snap-pari/build/bin/snap"
 
 def shift_imag_to_zero(x) :
-    print(x)
+    # print(x)
     while x.imag > pi :
       x -= twopi * 1j
-    print(x.imag, -pi + COMP_ERR, COMP_ERR, -pi + COMP_ERR)
+    # print(x.imag, -pi + COMP_ERR, COMP_ERR, -pi + COMP_ERR)
     while x.imag < -pi + COMP_ERR :
       x += twopi * 1j
-    print(x)
+    # print(x)
     return x  
-
-def get_box_codes(validated_params, depth=240) :
-    params_printed = False
-    sinhdx = validated_params['sinhdx']
-    sinhdy = validated_params['sinhdy']
-    coshmu = validated_params['coshmu']
-    cosf = validated_params['cosf']
-    sintx2 = validated_params['sintx2']
-    sinty2 = validated_params['sinty2']
-    coord = [0]*6
-    coord[0] = sinhdx / (scale[0] * 16.) # these are special
-    coord[1] = sinhdy / (scale[1] * 16.) # these are special
-    coord[2] = coshmu / scale[2]
-    coord[3] = cosf / scale[3]
-    coord[4] = sintx2 / scale[4]
-    coord[5] = sinty2 / scale[5]
-    codes_list = [{ 'code' : [], 'coord' : coord }]
-    validated_params['possibly_on_box_edge'] = False
-    for i in range(0, depth) :
-        for idx in range(0,len(codes_list)) :
-            code = codes_list[idx]['code'] # Object that will be modified
-            coord = codes_list[idx]['coord'] # Object that will be modified
-            n = i % 6
-            if 2 * coord[n] > COMP_ERR :
-                code.append('1')
-                coord[n] = 2 * coord[n] - 1
-            elif 2 * coord[n] < -COMP_ERR :
-                code.append('0')
-                coord[n] = 2 * coord[n] + 1
-            else :
-                assert abs(coord[n]) < COMP_ERR
-                print('Warning: Edge condition for manifold {0} with coord {1}. Will generate both children.'.format(validated_params['manifold'], coord[n]), file = sys.stderr)
-                if not params_printed:
-                  print(validated_params, file = sys.stderr)
-                  params_printed = True
-                validated_params['possibly_on_box_edge'] = True
-                new_code_dict = deepcopy(codes_list[idx])
-                new_code = new_code_dict['code']
-                new_coord = new_code_dict['coord']
-                # Old will go to the right
-                code.append('1')
-                coord[n] = 2 * coord[n] - 1
-                # New will go to the left
-                new_code.append('0')
-                new_coord[n] = 2 * new_coord[n] + 1
-                codes_list.append(new_code_dict)
-    box_codes = []
-    for code_dict in codes_list :
-        box_codes.append(''.join(code_dict['code']))
-    return box_codes
 
 def cosh_lox_move_dist(l,d) :
     """ Let l be the complex length of a loxodromic element g and
@@ -182,7 +132,7 @@ if __name__ == "__main__" :
         try :
             margulis_bound =  float(sys.argv[3])
         except :
-            print('Using initial margulis guess of {}'.format(margulis_bound))
+            print('Using initial margulis guess of {}'.format(margulis_bound), file = sys.stderr)
  
     name = '{} {}'.format(mfld_type, mfld_id)
     volume = None
@@ -289,15 +239,15 @@ if __name__ == "__main__" :
     ortho = best['ortho']
     t = best['point']
     if ortho.real == 0 or t == 0 or t == ortho.real : 
-        print("Not an internal parameter point!")
-        print(margulis_info)
+        print("Not an internal parameter point!", file = sys.stderr)
+        print(margulis_info, file = sys.stderr)
     else :
         coshmu = best['cosh_margulis']
         sinhdx = sinh(t)
         sinhdy = sinh(ortho.real - t)
         # corresponds to applying complex conj to the group to reduce parameter space
         do_conj = True if ortho.imag < 0 else False
-        print(do_conj)
+        # print(do_conj)
         cosf = cos(ortho.imag)
         l = best['left']
         r = best['right']
@@ -305,6 +255,7 @@ if __name__ == "__main__" :
           l = l.conjugate() 
           r = r.conjugate() 
           ortho = ortho.conjugate()
+          # print(l, r, ortho)
         l_pow = best['l_pow']
         r_pow = best['r_pow']
         x = shift_imag_to_zero(l * l_pow)
