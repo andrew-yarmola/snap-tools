@@ -6,7 +6,7 @@ use Math::Complex;
 use List::Util qw[min max pairs];
 
 my $type = '5';
-my @mld_idx = (3, 4, 6, 7, 9, 10, 11, 15);
+my @mld_idx = (4,);
 
 sub gcd {
     my ($a, $b) = (abs($_[0]), abs($_[1]));
@@ -18,7 +18,7 @@ sub gcd {
     return $b; 
 }
 
-my $s_len = 20;
+my $s_len = 100;
 my @slopes = (); 
 for my $i (-$s_len .. $s_len) {
     for my $j (0 .. $s_len) {
@@ -37,6 +37,6 @@ for my $n (@mld_idx) {
     for my $s (@slopes) {
         my $name = "$type $n fill (@$s)";
         print STDERR "$name\n";
-        `./margulis.py $type $n 0.8 @$s >> data_margulis_dehn_20.csv` 
+        `./margulis.py $type $n 0.5 @$s >> data_margulis_dehn_100.csv` 
     }
 }

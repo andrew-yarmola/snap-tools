@@ -8,6 +8,7 @@ from subprocess import check_output # switch from check_output to run in the fut
 from copy import deepcopy
 from box_codes import get_box_codes
 
+import pdb
 
 twopi = 2*pi
 COMP_ERR = pow(2,-100)
@@ -49,7 +50,11 @@ def get_margulis_bound(l1,l2,d) :
     except :
         try :
             g = partial(max_of_two,l1,l2,d)
-            res = minimize(g, d/2., bounds = ((0,d),))
+            if d == 0:
+              b = d + COMP_ERR
+            else:
+              b = d
+            res = minimize(g, d/2., bounds = ((0, b),))
             if res.success :
                 return { 'cosh_margulis' : res.fun[0], 'margulis' : arccosh(res.fun[0]), 'point' : res.x[0] }
             else :
@@ -193,6 +198,7 @@ if __name__ == "__main__" :
                 key = left + ':' + right
                 if key not in orthos :
                     orthos[key] = float(real) + float(imag) * 1j
+                    # print(orthos[key])
                 continue
         # increase guess if no orthos are found
         if not orthos :
@@ -215,6 +221,8 @@ if __name__ == "__main__" :
                     if isinstance(margulis_info, dict) :
                       margulis_info['l_pow'] = l_pow
                       margulis_info['r_pow'] = r_pow
+                      margulis_info['geods'] = key
+                      margulis_info['self'] = 'true' if left == right else 'false'
                       data.append(margulis_info)
                     R += r
                     r_pow += 1
@@ -229,19 +237,23 @@ if __name__ == "__main__" :
                 margulis_numbers.append(margulis_info)
 
         sorted_margulis = sorted(margulis_numbers, key = lambda x : x['margulis'])
-
         best = sorted_margulis[0]
         if best['margulis'] < margulis_bound :
             break
         else :
             margulis_bound = best['margulis'] + 0.0001 # just up by a little bit so it's really a bound and we termiante above
     # get the box code
-    ortho = best['ortho']
-    t = best['point']
-    if ortho.real == 0 or t == 0 or t == ortho.real : 
-        print("Not an internal parameter point!", file = sys.stderr)
-        print(margulis_info, file = sys.stderr)
-    else :
+    best_marg = best['margulis']
+    for best in sorted_margulis:
+        if best['margulis'] > best_marg + 0.01:
+            break 
+        ortho = best['ortho']
+        t = best['point']
+#        if ortho.real == 0 or t == 0 or t == ortho.real:
+#            if abs(best['left'].real - best['right'].real) < 0.0001:
+#                print("Not an internal parameter point!", file = sys.stderr)
+#                print(margulis_info, file = sys.stderr)
+#        else :
         coshmu = best['cosh_margulis']
         sinhdx = sinh(t)
         sinhdy = sinh(ortho.real - t)
@@ -252,10 +264,9 @@ if __name__ == "__main__" :
         l = best['left']
         r = best['right']
         if do_conj :
-          l = l.conjugate() 
-          r = r.conjugate() 
-          ortho = ortho.conjugate()
-          # print(l, r, ortho)
+            l = l.conjugate() 
+            r = r.conjugate() 
+            ortho = ortho.conjugate()
         l_pow = best['l_pow']
         r_pow = best['r_pow']
         x = shift_imag_to_zero(l * l_pow)
@@ -264,6 +275,7 @@ if __name__ == "__main__" :
         sintx2 = sin(x.imag / 2.)
         sinty2 = sin(y.imag / 2.)
         box_codes = get_box_codes({'manifold' : name, 'coshmu' : coshmu, 'sinhdx' : sinhdx, 'sinhdy' : sinhdy, 'cosf' : cosf, 'sintx2' : sintx2, 'sinty2' : sinty2 })
-        line = '"{}",' + '{},' * 17 +'"{}"'
-        print(line.format(name, volume, best['margulis'], l, r, ortho,
-                          t, ortho.real - t, l_pow, r_pow, x,y, sinhdx, sinhdy, coshmu, cosf, sintx2, sinty2, box_codes))
+        line = '"{}",' + '{},' * 19 +'"{}"'
+        if abs(sinhdx - sinhdy) < 0.0001 and abs(sintx2 - sinty2) < 0.0001 :
+           print(line.format(name, volume, best['margulis'], l, r, ortho,
+                  t, ortho.real - t, l_pow, r_pow, x,y, sinhdx, sinhdy, coshmu, cosf, sintx2, sinty2, best['geods'], best['self'], box_codes))

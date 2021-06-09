@@ -1,10 +1,17 @@
 # Computes box_codes from parameters
 
-scale_factor = 8
-scale = list(map(lambda x : scale_factor * pow(2, x / 6.), range(0,-6,-1)))
-COMP_ERR = pow(2,-100)
+import sys
+from copy import deepcopy
 
-def get_box_codes(validated_params, depth=240) :
+g_scale_factor = 8
+g_scale = list(map(lambda x : g_scale_factor * pow(2, x / 6.), range(0,-6,-1)))
+
+def get_box_codes(validated_params, depth=240, scale=None) :
+    COMP_ERR = pow(2,-100)
+    if scale is None:
+        scale = g_scale
+    else: # using Arb
+        COMP_ERR = 0
     params_printed = False
     sinhdx = validated_params['sinhdx']
     sinhdy = validated_params['sinhdy']
